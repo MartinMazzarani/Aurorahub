@@ -51,20 +51,21 @@ local RADIUS = { sm = 4, md = 7, lg = 10, xl = 14 }
 local SPACE  = { xs = 4, sm = 8, md = 12, lg = 16, xl = 24 }
 
 local Theme = {
-	Background   = Color3.fromRGB(10, 10, 12),
-	Chrome       = Color3.fromRGB(13, 13, 16),
-	Sidebar      = Color3.fromRGB(15, 15, 18),
-	SidebarAlt   = Color3.fromRGB(19, 19, 23),
-	Panel        = Color3.fromRGB(18, 18, 21),
-	Element      = Color3.fromRGB(24, 24, 28),
-	ElementHover = Color3.fromRGB(30, 30, 35),
-	Border       = Color3.fromRGB(28, 28, 33),
-	BorderSoft   = Color3.fromRGB(24, 24, 28),
-	Text         = Color3.fromRGB(235, 235, 238),
-	TextDim      = Color3.fromRGB(122, 122, 132),
-	TextFaint    = Color3.fromRGB(72, 72, 80),
-	Accent       = Color3.fromRGB(151, 105, 255),
-	AccentDim    = Color3.fromRGB(96, 68, 168),
+    Background = Color3.fromRGB(10, 10, 12),
+    Panel = Color3.fromRGB(16, 16, 20),
+    Element = Color3.fromRGB(22, 22, 27),
+    ElementHover = Color3.fromRGB(28, 28, 35),
+    ElementActive = Color3.fromRGB(35, 35, 45),
+    
+    Border = Color3.fromRGB(35, 35, 45),
+    BorderAccent = Color3.fromRGB(138, 92, 246),
+    
+    Text = Color3.fromRGB(245, 245, 247),
+    TextDim = Color3.fromRGB(140, 140, 155),
+    TextDark = Color3.fromRGB(100, 100, 115),
+    
+    Accent = Color3.fromRGB(138, 92, 246),
+    Accent2 = Color3.fromRGB(167, 139, 250), -- für Gradients
 }
 
 local TWEEN = TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
