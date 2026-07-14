@@ -75,19 +75,47 @@ local FONT  = Enum.Font.GothamMedium
 local FONT_BOLD = Enum.Font.GothamBold
 
 --// Small helpers -------------------------------------------------------------
+local function apply(obj, props)
+	-- Set properties directly, each guarded so one unsupported property can
+	-- never halt construction of the rest of the UI.
+	for k, v in pairs(props) do
+		local ok, err = pcall(function() obj[k] = v end)
+		if not ok then
+			warn("[AuroraUI] could not set " .. tostring(k) .. ": " .. tostring(err))
+		end
+	end
+end
+
 local function tween(obj, props, info)
-	local t = TweenService:Create(obj, info or TWEEN, props)
-	t:Play()
-	return t
+	info = info or TWEEN
+	local ok, t = pcall(function()
+		return TweenService:Create(obj, info, props)
+	end)
+	if ok and t and pcall(function() t:Play() end) then
+		return t
+	end
+	apply(obj, props) -- fallback: apply instantly if tweening fails
+	return nil
 end
 
 local function make(class, props, children)
 	local inst = Instance.new(class)
-	for k, v in pairs(props or {}) do
-		inst[k] = v
+	local parent = props and props.Parent
+	if props then
+		for k, v in pairs(props) do
+			if k ~= "Parent" then
+				local ok, err = pcall(function() inst[k] = v end)
+				if not ok then
+					warn("[AuroraUI] " .. class .. "." .. tostring(k) .. " failed: " .. tostring(err))
+				end
+			end
+		end
 	end
 	for _, c in ipairs(children or {}) do
 		c.Parent = inst
+	end
+	if parent then
+		inst.Parent = parent -- parent last so children exist before layout runs
 	end
 	return inst
 end
@@ -459,25 +487,41 @@ function Aurora:CreateWindow(cfg)
 	local minBtn = ctrlButton("–", 2)
 	local closeBtn = ctrlButton("✕", 3)
 
-	-- TabBar (center of topbar) ------------------------------------------
+	-- Tab strip (its own row below the topbar) ---------------------------
+	local tabStrip = make("Frame", {
+		Name = "TabStrip",
+		Position = UDim2.new(0, 0, 0, 44),
+		Size = UDim2.new(1, 0, 0, 40),
+		BackgroundColor3 = Theme.Background,
+		BorderSizePixel = 0,
+		Parent = root,
+	})
+	make("Frame", {  -- bottom hairline
+		Size = UDim2.new(1, 0, 0, 1),
+		Position = UDim2.new(0, 0, 1, -1),
+		BackgroundColor3 = Theme.Border,
+		BorderSizePixel = 0,
+		Parent = tabStrip,
+	})
+
 	local tabBar = make("Frame", {
 		Name = "TabBar",
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, 0),
-		Size = UDim2.new(0, 300, 0, 44),
+		Size = UDim2.new(1, 0, 1, 0),
 		BackgroundTransparency = 1,
-		Parent = topbar,
+		Parent = tabStrip,
 	})
-	local tabLayout = make("UIListLayout", {
+	make("UIListLayout", {
 		FillDirection = Enum.FillDirection.Horizontal,
-		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		HorizontalAlignment = Enum.HorizontalAlignment.Left,
 		VerticalAlignment = Enum.VerticalAlignment.Center,
-		Padding = UDim.new(0, 4),
+		Padding = UDim.new(0, 2),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		Parent = tabBar,
 	})
+	make("UIPadding", { PaddingLeft = UDim.new(0, 8), Parent = tabBar })
 
-	-- sliding underline indicator
+	-- sliding underline indicator (lives in the strip, not the tabBar, so
+	-- the tabBar's UIPadding doesn't shift it)
 	local indicator = make("Frame", {
 		Name = "Indicator",
 		AnchorPoint = Vector2.new(0, 1),
@@ -485,7 +529,7 @@ function Aurora:CreateWindow(cfg)
 		Size = UDim2.new(0, 0, 0, 2),
 		BackgroundColor3 = Theme.Accent,
 		BorderSizePixel = 0,
-		Parent = tabBar,
+		Parent = tabStrip,
 	})
 	corner(indicator, 2)
 	Aurora:_bindAccent(indicator, "BackgroundColor3")
@@ -493,8 +537,8 @@ function Aurora:CreateWindow(cfg)
 	-- Content holder ------------------------------------------------------
 	local content = make("Frame", {
 		Name = "Content",
-		Position = UDim2.new(0, 0, 0, 44),
-		Size = UDim2.new(1, 0, 1, -44),
+		Position = UDim2.new(0, 0, 0, 84),
+		Size = UDim2.new(1, 0, 1, -84),
 		BackgroundTransparency = 1,
 		Parent = root,
 	})
@@ -560,8 +604,8 @@ function Aurora:CreateWindow(cfg)
 		if btn.AbsoluteSize.X == 0 then
 			RunService.RenderStepped:Wait()
 		end
-		-- position relative to tabBar
-		local relX = btn.AbsolutePosition.X - tabBar.AbsolutePosition.X
+		-- position relative to the tab strip (indicator's parent)
+		local relX = btn.AbsolutePosition.X - tabStrip.AbsolutePosition.X
 		tween(indicator, {
 			Position = UDim2.new(0, relX, 1, 0),
 			Size = UDim2.new(0, btn.AbsoluteSize.X, 0, 2),
