@@ -120,8 +120,11 @@ local function make(class, props, children)
 	return inst
 end
 
+-- Consistent corner radii across the whole UI, softened for a cleaner look.
+local RADIUS = { Window = 12, Panel = 10, Element = 8, Small = 6 }
+
 local function corner(parent, radius)
-	return make("UICorner", { CornerRadius = UDim.new(0, radius or 6), Parent = parent })
+	return make("UICorner", { CornerRadius = UDim.new(0, radius or RADIUS.Element), Parent = parent })
 end
 
 local function stroke(parent, color, thickness)
@@ -129,6 +132,28 @@ local function stroke(parent, color, thickness)
 		Color = color or Theme.Border,
 		Thickness = thickness or 1,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		Parent = parent,
+	})
+end
+
+-- Soft drop shadow behind an element. Uses a 9-slice shadow image so it stays
+-- crisp at any size; if the asset ever fails to load it simply shows nothing,
+-- so the UI degrades gracefully rather than breaking.
+local SHADOW_IMAGE = "rbxassetid://5554236805"
+local function shadow(parent, spread, transparency)
+	spread = spread or 24
+	return make("ImageLabel", {
+		Name = "Shadow",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		Size = UDim2.new(1, spread, 1, spread),
+		Image = SHADOW_IMAGE,
+		ImageColor3 = Color3.fromRGB(0, 0, 0),
+		ImageTransparency = transparency or 0.45,
+		ScaleType = Enum.ScaleType.Slice,
+		SliceCenter = Rect.new(23, 23, 277, 277),
+		ZIndex = 0,
 		Parent = parent,
 	})
 end
@@ -284,7 +309,7 @@ function Aurora:Notify(cfg)
 		BackgroundTransparency = 1,
 		ClipsDescendants = true,
 	})
-	corner(card, 8)
+	corner(card, RADIUS.Panel)
 	local st = stroke(card, Theme.Border, 1)
 	st.Transparency = 1
 	pad(card, 12)
@@ -371,17 +396,27 @@ function Aurora:CreateWindow(cfg)
 	local subtitle = cfg.SubTitle or ""
 	local toggleKey = cfg.ToggleKey or Enum.KeyCode.RightShift
 
-	local root = make("Frame", {
-		Name = "Window",
+	-- Wrapper holds the shadow + the window. The window itself clips (for the
+	-- minimize animation); the wrapper does not, so the shadow stays visible.
+	local wrapper = make("Frame", {
+		Name = "Aurora",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.new(0.5, 0, 0.5, 0),
-		Size = UDim2.new(0, 600, 0, 440),
+		Size = UDim2.new(0, 600, 0, 470),
+		BackgroundTransparency = 1,
+		Parent = ScreenGui,
+	})
+	shadow(wrapper, 40, 0.4)
+
+	local root = make("Frame", {
+		Name = "Window",
+		Size = UDim2.new(1, 0, 1, 0),
 		BackgroundColor3 = Theme.Background,
 		BorderSizePixel = 0,
 		ClipsDescendants = true,
-		Parent = ScreenGui,
+		Parent = wrapper,
 	})
-	corner(root, 10)
+	corner(root, RADIUS.Window)
 	stroke(root, Theme.Border, 1)
 
 	-- Topbar --------------------------------------------------------------
@@ -553,7 +588,7 @@ function Aurora:CreateWindow(cfg)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 then
 				dragging = true
 				dragStart = input.Position
-				startPos = root.Position
+				startPos = wrapper.Position
 				input.Changed:Connect(function()
 					if input.UserInputState == Enum.UserInputState.End then
 						dragging = false
@@ -564,7 +599,7 @@ function Aurora:CreateWindow(cfg)
 		UserInputService.InputChanged:Connect(function(input)
 			if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
 				local delta = input.Position - dragStart
-				root.Position = UDim2.new(
+				wrapper.Position = UDim2.new(
 					startPos.X.Scale, startPos.X.Offset + delta.X,
 					startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 			end
@@ -572,28 +607,32 @@ function Aurora:CreateWindow(cfg)
 	end
 
 	-- Minimize / close ----------------------------------------------------
+	-- Animate the wrapper (root fills it by scale). Collapse to the title bar.
 	local minimized = false
-	local savedSize = root.Size
+	local savedSize = wrapper.Size
 	minBtn.MouseButton1Click:Connect(function()
 		minimized = not minimized
 		if minimized then
-			savedSize = root.Size
-			tween(root, { Size = UDim2.new(savedSize.X.Scale, savedSize.X.Offset, 0, 44) })
+			savedSize = wrapper.Size
+			tween(wrapper, { Size = UDim2.new(savedSize.X.Scale, savedSize.X.Offset, 0, 44) })
 		else
-			tween(root, { Size = savedSize })
+			tween(wrapper, { Size = savedSize })
 		end
 	end)
 	closeBtn.MouseButton1Click:Connect(function()
-		tween(root, { Size = UDim2.new(0, savedSize.X.Offset, 0, 0) }).Completed:Connect(function()
+		local t = tween(wrapper, { Size = UDim2.new(0, savedSize.X.Offset, 0, 0) })
+		if t then
+			t.Completed:Connect(function() ScreenGui:Destroy() end)
+		else
 			ScreenGui:Destroy()
-		end)
+		end
 	end)
 
 	-- Toggle visibility keybind ------------------------------------------
 	UserInputService.InputBegan:Connect(function(input, gpe)
 		if gpe then return end
 		if input.KeyCode == toggleKey then
-			root.Visible = not root.Visible
+			wrapper.Visible = not wrapper.Visible
 		end
 	end)
 
@@ -690,7 +729,7 @@ function Aurora:CreateWindow(cfg)
 				Parent = page,
 			})
 			self._sections = self._sections + 1
-			corner(holder, 8)
+			corner(holder, RADIUS.Panel)
 			stroke(holder, Theme.Border, 1)
 			pad(holder, 12)
 			make("UIListLayout", {
@@ -725,7 +764,7 @@ function Aurora:CreateWindow(cfg)
 					Parent = holder,
 				})
 				Section._order = Section._order + 1
-				corner(r, 6)
+				corner(r, RADIUS.Element)
 				return r
 			end
 
